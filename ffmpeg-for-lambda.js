@@ -11,10 +11,22 @@ var ffprobePath = '';
 /**
  * @typedef {Object} FFmpegOptions
  * @property {?function} callback receives the results after finish
- * @property {?Array} parameters string parameters sent into ffmpeg
- * @property {string} inputFile path to the file you want processed
- * @property {?string} outputFile path to ffmpeg output file. if not specified, one will be generated
- * @property {?string} outputFilePostfix if set and outputFile is not, the generated file will end in this
+ * @property {InputParameters} input information about the input file
+ * @property {OutputParameters} output information about the output file
+ */
+
+/**
+ * @typedef {Object} InputParameters
+ * @property {string} path to the file
+ * @property {Array} parameters to be applied to the input file
+ */
+
+/**
+ * @typedef {Object} OutputParameters
+ * @property {string} path to the file
+ * @property {?string} path to ffmpeg output file. if not specified, one will be generated
+ * @property {?string} postfix if set and path is not, the generated file will end in this
+ * @property {Array} parameters to be applied to the input file
  */
 
 /**
@@ -52,35 +64,33 @@ exports.ffmpeg = function (options) {
 		finalCallback = function () { };
 	}
 
-	var ffParameters = options['parameters'];
-	if (!Array.isArray(ffParameters)) {
-		ffParameters = [];
-	}
-
-	var inputFile = options['inputFile'];
-	if (typeof inputFile !== 'string' || !fs.existsSync(inputFile)) {
-		result.error = new Error('inputFile not set or not found');
+	var ffParameters = [];
+	if (!options.input || !options.input.path || !fs.existsSync(options.input.path)) {
+		result.error = new Error('input.path not set or not found');
 		finalCallback(result);
 		return;
 	}
-	ffParameters.push('-i');
-	ffParameters.push(inputFile);
-
-	var outputFile = options['outputFile'];
-	if (typeof outputFile !== 'string' || outputFile === '') {
-		var fileSyncSettings = { discardDescriptor: true };
-		if (typeof options['outputFilePostfix'] === 'string') {
-			fileSyncSettings.postfix = options['outputFilePostfix'];
-		} else {
-			result.error = new Error('outFile or outputFilePostix but be set');
-			finalCallback(result);
-			return;
-		}
-		outputFile = tmp.fileSync(fileSyncSettings).name;
-		ffParameters.push('-y');
+	if (options.input.parameters && Array.isArray(options.input.parameters)) {
+		ffParameters = ffParameters.concat(options.input.parameters);
 	}
-	ffParameters.push(outputFile);
-	result.outputFile = outputFile;
+	ffParameters.push('-i');
+	ffParameters.push(options.input.path);
+	
+	if (!options.output || (!options.output.path && !options.output.postfix)) {
+		result.error = new Error('output.path and output.postfix not set');
+		finalCallback(result);
+		return;
+	}
+	if (options.output.parameters && Array.isArray(options.output.parameters)) {
+		ffParameters = ffParameters.concat(options.output.parameters);
+	}
+	if (!options.output.path) {
+		ffParameters.push('-y');
+		result.outputFile = tmp.fileSync({ discardDescriptor: true, postfix: options.output.postfix }).name;
+	} else {
+		result.outputFile = options.output.path;
+	}
+	ffParameters.push(result.outputFile);
 
 	async.waterfall([
 		// make sure we have ffmpeg somewhere we can run it
