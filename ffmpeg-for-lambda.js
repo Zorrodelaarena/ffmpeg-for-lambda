@@ -127,7 +127,7 @@ exports.ffmpeg = function (options) {
 		function (callback) {
 			result.ffmpegCommand = ffmpegPath + ' ' + shellescape(ffParameters);
 			child_process.exec(result.ffmpegCommand, function (error, stdout, stderr) {
-				result.size = fs.statSync(outputFile).size;
+				result.size = fs.statSync(result.outputFile).size;
 				result.stdout = stdout;
 				result.stderr = stderr;
 				if (result.size < 1) {
