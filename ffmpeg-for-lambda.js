@@ -67,10 +67,14 @@ exports.ffmpeg = function (options) {
 	ffParameters.push(inputFile);
 
 	var outputFile = options['outputFile'];
-	if (typeof outputFile !== 'string') {
+	if (typeof outputFile !== 'string' || outputFile === '') {
 		var fileSyncSettings = { discardDescriptor: true };
 		if (typeof options['outputFilePostfix'] === 'string') {
 			fileSyncSettings.postfix = options['outputFilePostfix'];
+		} else {
+			result.error = new Error('outFile or outputFilePostix but be set');
+			finalCallback(result);
+			return;
 		}
 		outputFile = tmp.fileSync(fileSyncSettings).name;
 		ffParameters.push('-y');
