@@ -51,7 +51,7 @@ exports.ffmpeg = function (options) {
 	}
 
 	var ffParameters = options['parameters'];
-	if (Array.isArray(ffParameters)) {
+	if (!Array.isArray(ffParameters)) {
 		ffParameters = [];
 	}
 
