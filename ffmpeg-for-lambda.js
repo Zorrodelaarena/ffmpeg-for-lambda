@@ -24,6 +24,7 @@ var ffprobePath = '';
  * @property {string} outputFile path to output file
  * @property {string} stdout stdout from ffmpeg
  * @property {string} stderr stderr from ffmpeg
+ * @property {string} ffmpegCommand the command that was run (if there was one) (for debugging)
 */
 
 /**
@@ -38,7 +39,8 @@ exports.ffmpeg = function (options) {
 		size: 0,
 		outputFile: '',
 		stdout: '',
-		stderr: ''
+		stderr: '',
+		ffmpegCommand: ''
 	};
 
 	if (typeof options !== 'object') {
@@ -56,8 +58,8 @@ exports.ffmpeg = function (options) {
 	}
 
 	var inputFile = options['inputFile'];
-	if (typeof inputFile !== 'string') {
-		result.error = new Error('inputFile not set');
+	if (typeof inputFile !== 'string' || !fs.existsSync(inputFile)) {
+		result.error = new Error('inputFile not set or not found');
 		finalCallback(result);
 		return;
 	}
@@ -109,8 +111,8 @@ exports.ffmpeg = function (options) {
 		},
 		// run ffmpeg
 		function (callback) {
-			var cmd = ffmpegPath + ' ' + shellescape(ffParameters);
-			child_process.exec(cmd, function (error, stdout, stderr) {
+			result.ffmpegCommand = ffmpegPath + ' ' + shellescape(ffParameters);
+			child_process.exec(result.ffmpegCommand, function (error, stdout, stderr) {
 				result.size = fs.statSync(outputFile).size;
 				result.stdout = stdout;
 				result.stderr = stderr;
