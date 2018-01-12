@@ -81,7 +81,7 @@ exports.ffmpeg = function (options) {
 		function (callback) {
 			if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
 				var newFFmpegPath = tmp.fileSync({ discardDescriptor: true, prefix: 'ffmpeg-' }).name;
-				child_process.exec('cp bin/ffmpeg ' + newFFmpegPath, function (error, stdout, stderr) {
+				child_process.exec('cp ' + __dirname + '/bin/ffmpeg ' + newFFmpegPath, function (error, stdout, stderr) {
 					if (error) {
 						result.stdout = stdout;
 						result.stderr = stderr;
