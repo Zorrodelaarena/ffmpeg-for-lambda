@@ -27,6 +27,7 @@ var ffprobePath = '';
  * @property {?string} path to ffmpeg output file. if not specified, one will be generated
  * @property {?string} postfix if set and path is not, the generated file will end in this
  * @property {Array} parameters to be applied to the input file
+ * @property {?boolean} matchInputRates should we match bit and sample rate of the source file (if possible?)
  */
 
 /**
@@ -77,6 +78,16 @@ exports.ffmpeg = function (options) {
 	ffParameters.push(options.input.path);
 
 	if (options.output) {
+		if (options.output.matchInputRates) {
+			var rateParameterGenerator = new RateParameterGenerator();
+			rateParameterGenerator.matchSource(options.input.path, function (err) {
+				if (err) {
+					rateParameterGenerator.setBitRate(48000);
+					rateParameterGenerator.setSampleRate(320000);
+				}
+
+			});
+		}
 		if (options.output.parameters && Array.isArray(options.output.parameters)) {
 			ffParameters = ffParameters.concat(options.output.parameters);
 		}
@@ -172,6 +183,104 @@ function initializeFFProbe(finalCallback) {
 			});
 		}
 	]);
+}
+
+/**
+ * Gets a standardized ffprobe info dump
+ * @param {string} path to the file
+ * @param {function} callback called with (err, {Object} fileInfo)
+ */
+function getFFProbeInfo(path, callback) {
+	initializeFFProbe(function (err) {
+		if (err) return callback(err);
+
+		var command = ffprobePath + ' ' + shellescape(['-i', path, '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams']);
+		child_process.exec(command, function (error, stdout, stderr) {
+			var fileInfo = JSON.parse(stdout);
+			if (!fileInfo || !fileInfo.streams || !Array.isArray(fileInfo.streams) || !fileInfo.streams.length) {
+				callback(new Error('no file info found in ' + stdout));
+			} else {
+				callback(null, fileInfo);
+			}
+		});
+	});
+}
+
+function RateParameterGenerator() {
+
+	var minSampleRate = 0;
+	var minBitRate = 0;
+	var forcedSampleRate = 0;
+	var forcedBitRate = 0;
+	var forcedCodec = '';
+
+	var sourceCodec = '';
+	var sourceSampleRate = 0;
+	var sourceBitRate = 0;
+
+	this.setMinSimpleRate = function (sampleRate) {
+		minSampleRate = sampleRate;
+	};
+
+	this.setMinBitRate = function (bitRate) {
+		minBitRate = bitRate;
+	};
+
+	this.setSampleRate = function (sampleRate) {
+		forcedSampleRate = sampleRate;
+	};
+
+	this.setBitRate = function (bitRate) {
+		forcedBitRate = bitRate;
+	};
+
+	this.setCodec = function (codec) {
+		forcedCodec = codec;
+	};
+
+	this.matchSource = function (sourcePath, callback) {
+		getFFProbeInfo(path, function (err, fileInfo) {
+			if (err) return callback(err);
+
+			var stream = fileInfo.streams[0];
+			if (!stream.sample_rate) {
+				return callback(new Error('Unable to parse sample rate from source'));
+			}
+			sourceSampleRate = stream.sample_rate;
+			sourceCodec = stream.codec_name;
+			sourceBitRate = stream.bit_rate;
+			callback(null);
+		});
+	};
+
+	this.generateParameters = function (newFormat) {
+		let sr = sourceSampleRate;
+		let br = sourceBitRate;
+		if (forcedBitRate !== 0) {
+			br = forcedBitRate;
+		} else if (minBitRate !== 0) {
+			br = Math.min(minBitRate, br);
+		}
+		if (forcedSampleRate !== 0) {
+			sr = forcedSampleRate;
+		} else if (minSampleRate !== 0) {
+			sr = Math.min(minSampleRate, sr);
+		}
+		if (newFormat === 'mp3' || sourceCodec.indexOf('pcm') === -1) {
+			return ['-ar', sr, '-ab', br];
+		} else {
+			var codec = sourceCodec;
+			if (forcedCodec !== '') {
+				codec = forcedCodec;
+			} else if (newFormat === 'wav') {
+				codec = codec.replace('be', 'le');
+			} else if (newFormat === 'aiff') {
+				codec = codec.replace('le', 'be');
+			}
+			return ['-ar', sr, '-acodec', codec];
+		}
+	};
+
 }
 
 /**
@@ -291,17 +400,9 @@ function removeEmptiesFromArray(arr) {
  * @param {function} callback takes (error, channelCount)
  */
 exports.getStreamCount = function (path, callback) {
-	initializeFFProbe(function (err) {
+	getFFProbeInfo(path, function (err, fileInfo) {
 		if (err) return callback(err);
 
-		var command = ffprobePath + ' ' + shellescape(['-i', path, '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams']);
-		child_process.exec(command, function (error, stdout, stderr) {
-			var fileInfo = JSON.parse(stdout);
-			if (!fileInfo || !fileInfo.streams || !Array.isArray(fileInfo.streams) || !fileInfo.streams.length) {
-				callback(new Error('no file info found in ' + stdout));
-			} else {
-				callback(null, parseInt(fileInfo.streams[0].channels));
-			}
-		});
+		callback(null, parseInt(fileInfo.streams[0].channels));
 	});
 };
