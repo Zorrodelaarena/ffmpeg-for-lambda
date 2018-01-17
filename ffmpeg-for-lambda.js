@@ -297,8 +297,8 @@ exports.getMp3StreamCount = function (path, callback) {
 		var command = ffprobePath + ' ' + shellescape(['-i', path, '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams']);
 		child_process.exec(command, function (error, stdout, stderr) {
 			var fileInfo = JSON.parse(stdout);
-			if (!fileInfo || !fileInfo.streams || Array.isArray(fileInfo.streams) || !fileInfo.streams.length) {
-				callback(new Error('no file info found', stdout));
+			if (!fileInfo || !fileInfo.streams || !Array.isArray(fileInfo.streams) || !fileInfo.streams.length) {
+				callback(new Error('no file info found in ' + stdout));
 			} else {
 				callback(null, parseInt(fileInfo.streams[0].channels));
 			}
