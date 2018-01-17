@@ -151,10 +151,7 @@ function initializeFFProbe(finalCallback) {
 				var newFFProbePath = tmp.fileSync({ discardDescriptor: true, prefix: 'ffmpeg-' }).name;
 				child_process.exec('cp ' + __dirname + '/bin/ffprobe ' + newFFProbePath, function (error, stdout, stderr) {
 					if (error) {
-						result.stdout = stdout;
-						result.stderr = stderr;
-						result.error = new Error('Failed to copy ffprobe to ' + newFFProbePath);
-						finalCallback(result);
+						finalCallback(new Error('Failed to copy ffprobe to ' + newFFProbePath));
 					} else {
 						ffprobePath = newFFProbePath;
 						callback(null);
@@ -168,10 +165,9 @@ function initializeFFProbe(finalCallback) {
 		function (callback) {
 			fs.chmod(ffprobePath, 0777, function (err) {
 				if (err) {
-					result.error = err;
-					finalCallback(result);
+					finalCallback(err);
 				} else {
-					callback(null);
+					finalCallback(null);
 				}
 			});
 		}
@@ -288,3 +284,24 @@ function uniqueArray(arr) {
 function removeEmptiesFromArray(arr) {
 	return arr.filter(elem => elem);
 }
+
+/**
+ * Gets the number of streams in an mp3 file
+ * @param {string} path to the file
+ * @param {function} callback takes (error, channelCount)
+ */
+exports.getMp3StreamCount = function (path, callback) {
+	initializeFFProbe(function (err) {
+		if (err) return callback(err);
+
+		var command = ffprobePath + ' ' + shellescape(['-i', path, '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams']);
+		child_process.exec(command, function (error, stdout, stderr) {
+			var fileInfo = JSON.parse(stdout);
+			if (!fileInfo || !fileInfo.streams || Array.isArray(fileInfo.streams) || !fileInfo.streams.length) {
+				callback(new Error('no file info found', stdout));
+			} else {
+				callback(null, parseInt(fileInfo.streams[0].channels));
+			}
+		});
+	});
+};
