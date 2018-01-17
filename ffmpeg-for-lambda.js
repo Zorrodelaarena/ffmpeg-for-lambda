@@ -286,11 +286,11 @@ function removeEmptiesFromArray(arr) {
 }
 
 /**
- * Gets the number of streams in an mp3 file
+ * Gets the number of streams in a file
  * @param {string} path to the file
  * @param {function} callback takes (error, channelCount)
  */
-exports.getMp3StreamCount = function (path, callback) {
+exports.getStreamCount = function (path, callback) {
 	initializeFFProbe(function (err) {
 		if (err) return callback(err);
 
