@@ -407,3 +407,12 @@ exports.getStreamCount = function (path, callback) {
 		callback(null, parseInt(fileInfo.streams[0].channels));
 	});
 };
+
+exports.cleanup = function () {
+	if (ffmpegPath && fs.existsSync(ffmpegPath)) {
+		fs.unlinkSync(ffmpegPath);
+	}
+	if (ffprobePath && fs.existsSync(ffprobePath)) {
+		fs.unlinkSync(ffprobePath);
+	}
+};
