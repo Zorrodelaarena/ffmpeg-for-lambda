@@ -4,6 +4,7 @@ var child_process = require('child_process');
 var async = require('async');
 var tmp = require('tmp');
 var shellescape = require('shell-escape');
+var path = require('path');
 
 var ffmpegPath = '';
 var ffprobePath = '';
@@ -27,7 +28,7 @@ var ffprobePath = '';
  * @property {?string} path to ffmpeg output file. if not specified, one will be generated
  * @property {?string} postfix if set and path is not, the generated file will end in this
  * @property {Array} parameters to be applied to the input file
- * @property {?boolean} matchInputRates should we match bit and sample rate of the source file (if possible?)
+ * @property {?RateParameterGenerator} rateParameterGenerator if set, will be called for bit and sample rate parameters
  */
 
 /**
@@ -78,15 +79,11 @@ exports.ffmpeg = function (options) {
 	ffParameters.push(options.input.path);
 
 	if (options.output) {
-		if (options.output.matchInputRates) {
-			var rateParameterGenerator = new RateParameterGenerator();
-			rateParameterGenerator.matchSource(options.input.path, function (err) {
-				if (err) {
-					rateParameterGenerator.setBitRate(48000);
-					rateParameterGenerator.setSampleRate(320000);
-				}
-
-			});
+		if (options.rateParameterGenerator && (options.output.path || options.output.postfix)) {
+			let newExtension = path.extname(options.output.postfix || options.output.path).substring(1);
+			if (newExtension !== '') {
+				ffParameters = ffParameters.concat(options.rateParameterGenerator.generateParameters(newExtension));
+			}
 		}
 		if (options.output.parameters && Array.isArray(options.output.parameters)) {
 			ffParameters = ffParameters.concat(options.output.parameters);
@@ -105,7 +102,7 @@ exports.ffmpeg = function (options) {
 		// make sure we have ffmpeg somewhere we can run it
 		function (callback) {
 			if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
-				var newFFmpegPath = tmp.fileSync({ discardDescriptor: true, prefix: 'ffmpeg-' }).name;
+				let newFFmpegPath = tmp.fileSync({ discardDescriptor: true, prefix: 'ffmpeg-' }).name;
 				child_process.exec('cp ' + __dirname + '/bin/ffmpeg ' + newFFmpegPath, function (error, stdout, stderr) {
 					if (error) {
 						result.stdout = stdout;
@@ -205,6 +202,10 @@ function getFFProbeInfo(path, callback) {
 		});
 	});
 }
+
+exports.createRateParameterGenerator = function () {
+	return new RateParameterGenerator();
+};
 
 function RateParameterGenerator() {
 
